@@ -8,6 +8,9 @@
     "ethers": "^5.4.2",
     "hardhat": "^2.5.0"
   },
+  "scripts": {
+    "test": "yarn hardhat test"
+  },
   "dependencies": {
     "@openzeppelin/contracts": "^4.2.0"
   }
