@@ -1,15 +1,18 @@
 {
   "name": "hardhat-project",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.2",
-    "hardhat": "^2.5.0"
+    "hardhat": "^2.5.0",
+    "solidity-coverage": "^0.7.16"
   },
   "scripts": {
-    "test": "yarn hardhat test"
+    "test": "yarn hardhat test",
+    "coverage": "yarn hardhat coverage"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.2.0"
