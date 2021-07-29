@@ -126,7 +126,7 @@ contract Vesting is Ownable {
         Schedule storage schedule = schedules[msg.sender][scheduleNumber];
         require(
             schedule.cliffTime <= block.timestamp,
-            "Vesting: cliffTime not reached"
+            "Vesting: cliff not reached"
         );
         require(schedule.totalAmount > 0, "Vesting: not claimable");
 

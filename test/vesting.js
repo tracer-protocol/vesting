@@ -83,6 +83,11 @@ describe("Unit Test: Vesting", function () {
                 expect(userVesting.endTime).to.equal(10 * 7 * 24 * 60 * 60); // 10 days in seconds
             });
 
+            it("increments the users number of schedules", async() => {
+                let userSchedules = await vesting.numberOfSchedules(accounts[0].address)
+                expect(userSchedules).to.equal(1)
+            })
+
         });
     });
 
@@ -119,8 +124,8 @@ describe("Unit Test: Vesting", function () {
                 await vesting.multiVest(
                     [accounts[1].address, accounts[2].address],
                     [
-                        ethers.utils.parseEther("1"),
-                        ethers.utils.parseEther("1"),
+                        ethers.utils.parseEther("2"),
+                        ethers.utils.parseEther("2"),
                     ],
                     token.address,
                     true,
@@ -129,7 +134,11 @@ describe("Unit Test: Vesting", function () {
                     0
                 );
                 
-                // todo verify schedules
+                // verify schedules
+                let userSchedule1 = await vesting.schedules(accounts[1].address, 0);
+                let userSchedule2 = await vesting.schedules(accounts[2].address, 0);
+                expect(userSchedule1.totalAmount).to.equal(ethers.utils.parseEther("2"));
+                expect(userSchedule2.totalAmount).to.equal(ethers.utils.parseEther("2"));
             });
         });
     });
@@ -149,6 +158,15 @@ describe("Unit Test: Vesting", function () {
                 now
             );
         });
+
+        context("when the cliff time has not been reached", async() => {
+            it("reverts", async() => {
+                await expect(
+                    vesting.connect(accounts[1]).claim(0)
+                ).to.be.revertedWith("Vesting: cliff not reached");
+            })
+        })
+
         context("when sender is not vester", async () => {
             it("reverts", async () => {
                 await expect(
@@ -179,7 +197,7 @@ describe("Unit Test: Vesting", function () {
         });
 
         context("when all tokens have been claimed", async () => {
-            it("sends no more and does not reduce tokens locked", async () => {
+            it("does not send more", async () => {
                 // fast forward 11 days
                 await forwardTime(11 * 7 * 24 * 60 * 60);
                 // claim once first
@@ -260,6 +278,15 @@ describe("Unit Test: Vesting", function () {
                     );
                 });
             });
+
+            context("if all tokens have been claimed", async() => {
+                it("reverts", async() => {
+                    // claim all tokens from user
+                    await forwardTime(7 * 7 * 24 * 60 * 60);
+                    await vesting.connect(accounts[1]).claim(0);
+                    await expect(vesting.rug(accounts[1].address, 0)).to.be.revertedWith("Vesting: Tokens fully claimed")
+                })
+            })
         });
     });
 
