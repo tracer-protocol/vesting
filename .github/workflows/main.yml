@@ -1,0 +1,28 @@
+name: Actions
+on:
+    push
+
+jobs:
+    lint:
+        name: Run lints
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Install dependencies
+              run: yarn install
+
+            - name: Run Prettier
+              run: yarn run lint
+    test:
+        name: Run test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Install dependencies
+              run: yarn install
+
+            - name: Run Prettier
+              run: yarn test
+
