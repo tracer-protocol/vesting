@@ -5,10 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
-* Tracer Standard Vesting Contract
-*/
+ * Tracer Standard Vesting Contract
+ */
 contract Vesting is Ownable {
-
     struct Schedule {
         uint256 totalAmount;
         uint256 claimedAmount;
@@ -25,10 +24,11 @@ contract Vesting is Ownable {
 
     mapping(address => uint256) public locked;
 
-    event Claim(uint256 amount, address claimer);
+    event Claim(address indexed claimer, uint256 amount);
+    event Vest(address indexed to, uint256 amount);
     event Cancelled(address account);
 
-    constructor() { }
+    constructor() {}
 
     /**
      * @notice Sets up a vesting schedule for a set user.
@@ -58,6 +58,7 @@ contract Vesting is Ownable {
         );
 
         uint256 currentLocked = locked[asset];
+
         // require the token is present
         require(
             IERC20(asset).balanceOf(address(this)) >= currentLocked + amount,
@@ -77,6 +78,7 @@ contract Vesting is Ownable {
         );
         numberOfSchedules[account] = currentNumSchedules + 1;
         locked[asset] = currentLocked + amount;
+        emit Vest(account, amount);
     }
 
     /**
@@ -87,8 +89,8 @@ contract Vesting is Ownable {
      * @param amount an array of the amount of tokens being vested for each user.
      * @param asset the asset that the user is being vested
      * @param isFixed bool setting if these vesting schedules can be rugged or not.
-     * @param cliffWeek the number of weeks that the cliff will be present at.
-     * @param vestingWeek the number of weeks the tokens will vest over (linearly)
+     * @param cliffWeeks the number of weeks that the cliff will be present at.
+     * @param vestingWeeks the number of weeks the tokens will vest over (linearly)
      * @param startTime the timestamp for when this vesting should have started
      */
     function multiVest(
@@ -96,8 +98,8 @@ contract Vesting is Ownable {
         uint256[] calldata amount,
         address asset,
         bool isFixed,
-        uint256 cliffWeek,
-        uint256 vestingWeek,
+        uint256 cliffWeeks,
+        uint256 vestingWeeks,
         uint256 startTime
     ) external onlyOwner {
         uint256 numberOfAccounts = accounts.length;
@@ -111,8 +113,8 @@ contract Vesting is Ownable {
                 amount[i],
                 asset,
                 isFixed,
-                cliffWeek,
-                vestingWeek,
+                cliffWeeks,
+                vestingWeeks,
                 startTime
             );
         }
@@ -131,13 +133,12 @@ contract Vesting is Ownable {
         require(schedule.totalAmount > 0, "Vesting: not claimable");
 
         // Get the amount to be distributed
-        uint256 amount =
-            calcDistribution(
-                schedule.totalAmount,
-                block.timestamp,
-                schedule.startTime,
-                schedule.endTime
-            );
+        uint256 amount = calcDistribution(
+            schedule.totalAmount,
+            block.timestamp,
+            schedule.startTime,
+            schedule.endTime
+        );
 
         // Cap the amount at the total amount
         amount = amount > schedule.totalAmount ? schedule.totalAmount : amount;
@@ -145,7 +146,7 @@ contract Vesting is Ownable {
         schedule.claimedAmount = amount; // set new claimed amount based off the curve
         locked[schedule.asset] = locked[schedule.asset] - amountToTransfer;
         IERC20(schedule.asset).transfer(msg.sender, amountToTransfer);
-        emit Claim(amount, msg.sender);
+        emit Claim(msg.sender, amount);
     }
 
     /**
@@ -153,35 +154,16 @@ contract Vesting is Ownable {
      * @dev Any outstanding tokens are returned to the system.
      * @param account the account of the user whos vesting schedule is being cancelled.
      */
-    function rug(address account, uint256 scheduleId)
-        public
-        onlyOwner
-    {
+    function rug(address account, uint256 scheduleId) public onlyOwner {
         Schedule storage schedule = schedules[account][scheduleId];
-        require(
-            schedule.claimedAmount < schedule.totalAmount,
-            "Vesting: Tokens fully claimed"
-        );
         require(!schedule.isFixed, "Vesting: Account is fixed");
-        uint256 outstandingAmount =
-            schedule.totalAmount - schedule.claimedAmount;
+        uint256 outstandingAmount = schedule.totalAmount -
+            schedule.claimedAmount;
+        require(outstandingAmount != 0, "Vesting: no outstanding tokens");
         schedule.totalAmount = 0;
         locked[schedule.asset] = locked[schedule.asset] - outstandingAmount;
         IERC20(schedule.asset).transfer(owner(), outstandingAmount);
         emit Cancelled(account);
-    }
-
-    /**
-     * @return returns the total amount and total claimed amount of a users vesting schedule.
-     * @param account the user to retrieve the vesting schedule for.
-     * @param scheduleId the id of the schedule to view
-     */
-    function getVesting(address account, uint256 scheduleId)
-        public
-        view
-        returns (Schedule memory)
-    {
-        return schedules[account][scheduleId];
     }
 
     /**
@@ -198,8 +180,14 @@ contract Vesting is Ownable {
         uint256 startTime,
         uint256 endTime
     ) public pure returns (uint256) {
-        return
-            (amount * (currentTime - startTime)) / (endTime - startTime);
+        // avoid uint underflow
+        if (currentTime < startTime) {
+            return 0;
+        }
+
+        // if endTime < startTime, this will throw. Since endTime should never be
+        // less than startTime in safe operation, this is fine.
+        return (amount * (currentTime - startTime)) / (endTime - startTime);
     }
 
     /**
