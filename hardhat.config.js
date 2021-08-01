@@ -1,6 +1,6 @@
 require("@nomiclabs/hardhat-waffle")
 require("solidity-coverage")
-require('hardhat-deploy')
+require("hardhat-deploy")
 
 const mnemonic = ""
 /**
@@ -24,6 +24,6 @@ module.exports = {
         },
     },
     namedAccounts: {
-        deployer: 0
+        deployer: 0,
     },
 }
