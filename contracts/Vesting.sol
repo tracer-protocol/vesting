@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.0;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -53,8 +53,10 @@ contract Vesting is Ownable {
     ) public onlyOwner {
         // ensure cliff is shorter than vesting
         require(
-            vestingWeeks >= cliffWeeks,
-            "Vesting: cliff after vesting period"
+            vestingWeeks > 0 && 
+            vestingWeeks >= cliffWeeks &&
+            amount > 0,
+            "Vesting: invalid vesting params"
         );
 
         uint256 currentLocked = locked[asset];
@@ -124,7 +126,7 @@ contract Vesting is Ownable {
      * @notice allows users to claim vested tokens if the cliff time has passed.
      * @param scheduleNumber which schedule the user is claiming against
      */
-    function claim(uint256 scheduleNumber) public {
+    function claim(uint256 scheduleNumber) external {
         Schedule storage schedule = schedules[msg.sender][scheduleNumber];
         require(
             schedule.cliffTime <= block.timestamp,
@@ -145,7 +147,7 @@ contract Vesting is Ownable {
         uint256 amountToTransfer = amount - schedule.claimedAmount;
         schedule.claimedAmount = amount; // set new claimed amount based off the curve
         locked[schedule.asset] = locked[schedule.asset] - amountToTransfer;
-        IERC20(schedule.asset).transfer(msg.sender, amountToTransfer);
+        require(IERC20(schedule.asset).transfer(msg.sender, amountToTransfer), "Vesting: transfer failed");
         emit Claim(msg.sender, amount);
     }
 
@@ -154,7 +156,7 @@ contract Vesting is Ownable {
      * @dev Any outstanding tokens are returned to the system.
      * @param account the account of the user whos vesting schedule is being cancelled.
      */
-    function rug(address account, uint256 scheduleId) public onlyOwner {
+    function rug(address account, uint256 scheduleId) external onlyOwner {
         Schedule storage schedule = schedules[account][scheduleId];
         require(!schedule.isFixed, "Vesting: Account is fixed");
         uint256 outstandingAmount = schedule.totalAmount -
@@ -162,7 +164,7 @@ contract Vesting is Ownable {
         require(outstandingAmount != 0, "Vesting: no outstanding tokens");
         schedule.totalAmount = 0;
         locked[schedule.asset] = locked[schedule.asset] - outstandingAmount;
-        IERC20(schedule.asset).transfer(owner(), outstandingAmount);
+        require(IERC20(schedule.asset).transfer(owner(), outstandingAmount), "Vesting: transfer failed");
         emit Cancelled(account);
     }
 
@@ -194,12 +196,12 @@ contract Vesting is Ownable {
      * @notice Withdraws TCR tokens from the contract.
      * @dev blocks withdrawing locked tokens.
      */
-    function withdraw(uint256 amount, address asset) public onlyOwner {
+    function withdraw(uint256 amount, address asset) external onlyOwner {
         IERC20 token = IERC20(asset);
         require(
             token.balanceOf(address(this)) - locked[asset] >= amount,
             "Vesting: Can't withdraw"
         );
-        token.transfer(owner(), amount);
+        require(token.transfer(owner(), amount), "Vesting: withdraw failed");
     }
 }
