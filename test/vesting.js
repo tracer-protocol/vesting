@@ -36,7 +36,39 @@ describe("Unit Test: Vesting", function () {
                         5,
                         0
                     )
-                ).to.be.revertedWith("Vesting: cliff after vesting period")
+                ).to.be.revertedWith("Vesting: invalid vesting params")
+            })
+        })
+
+        context("when amount = 0", async () => {
+            it("reverts", async () => {
+                await expect(
+                    vesting.vest(
+                        accounts[0].address,
+                        ethers.utils.parseEther("0"),
+                        token.address,
+                        true,
+                        5,
+                        10,
+                        0
+                    )
+                ).to.be.revertedWith("Vesting: invalid vesting params")
+            })
+        })
+
+        context("when vesting weeks = 0", async () => {
+            it("reverts", async () => {
+                await expect(
+                    vesting.vest(
+                        accounts[0].address,
+                        ethers.utils.parseEther("1"),
+                        token.address,
+                        true,
+                        0,
+                        0,
+                        0
+                    )
+                ).to.be.revertedWith("Vesting: invalid vesting params")
             })
         })
 
