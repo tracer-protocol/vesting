@@ -7,7 +7,7 @@
         "chai": "^4.3.4",
         "ethereum-waffle": "^3.4.0",
         "ethers": "^5.4.2",
-        "hardhat": "^2.5.0",
+        "hardhat": "^2.6.1",
         "hardhat-deploy": "^0.8.11",
         "solidity-coverage": "^0.7.16"
     },
