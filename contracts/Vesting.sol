@@ -24,8 +24,8 @@ contract Vesting is Ownable {
 
     mapping(address => uint256) public locked;
 
-    event Claim(address indexed claimer, uint256 amount);
-    event Vest(address indexed to, uint256 amount);
+    event Claim(address indexed claimer, uint256 amount, address asset);
+    event Vest(address indexed to, uint256 amount, address asset);
     event Cancelled(address account);
 
     constructor() {}
@@ -80,7 +80,7 @@ contract Vesting is Ownable {
         );
         numberOfSchedules[account] = currentNumSchedules + 1;
         locked[asset] = currentLocked + amount;
-        emit Vest(account, amount);
+        emit Vest(account, amount, asset);
     }
 
     /**
@@ -148,7 +148,7 @@ contract Vesting is Ownable {
         schedule.claimedAmount = amount; // set new claimed amount based off the curve
         locked[schedule.asset] = locked[schedule.asset] - amountToTransfer;
         require(IERC20(schedule.asset).transfer(msg.sender, amountToTransfer), "Vesting: transfer failed");
-        emit Claim(msg.sender, amount);
+        emit Claim(msg.sender, amount, schedule.asset);
     }
 
     /**
