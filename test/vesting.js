@@ -27,15 +27,17 @@ describe("Unit Test: Vesting", function () {
         context("when not called by the owner", async () => {
             it("reverts", async () => {
                 await expect(
-                    vesting.connect(accounts[1]).vest(
-                        accounts[0].address,
-                        ethers.utils.parseEther("1"),
-                        token.address,
-                        true,
-                        10,
-                        5,
-                        0
-                    )
+                    vesting
+                        .connect(accounts[1])
+                        .vest(
+                            accounts[0].address,
+                            ethers.utils.parseEther("1"),
+                            token.address,
+                            true,
+                            10,
+                            5,
+                            0
+                        )
                 ).to.be.revertedWith("Ownable: caller is not the owner")
             })
         })

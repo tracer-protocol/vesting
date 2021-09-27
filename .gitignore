@@ -5,6 +5,7 @@ cache
 artifacts
 coverage/
 coverage.json
+typechain
 
 #NPM
 package-lock.json
