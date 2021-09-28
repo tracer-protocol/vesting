@@ -133,9 +133,4 @@ contract FundManagement is Ownable {
         );
         token.safeTransfer(owner(), amount);
     }
-
-    function emergencyWithdraw(uint256 amount, address asset) external onlyOwner {
-        IERC20 token = IERC20(asset);
-        token.safeTransfer(owner(), amount);
-    }
 }
