@@ -25,6 +25,16 @@ contract FundManagement is Ownable {
 
     constructor() {}
 
+    /* ========== VIEWS ========== */
+
+    /**
+     * @notice Checks a users fund if they passed the withdraw window and amount they're able to claim.
+     */
+    function checkClaimableAmount(address account, uint256 fundNumber) external view returns (bool claimable, uint256 amount) {
+        Fund memory fund = funds[account][fundNumber];
+        return (block.timestamp >= fund.requestedWithdrawTime, fund.pendingWithdrawAmount);
+    }
+
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
@@ -81,15 +91,7 @@ contract FundManagement is Ownable {
         emit Claim(msg.sender, pendingAmount);
     }
 
-    /* ========== ONLY OWNER FUNCTIONS ========== */
-
-    /**
-     * @notice Change the duration of time a fund manager needs to wait to withdraw funds they request.
-     * @param duration of time in seconds.
-     */
-    function setRequestWindow(uint256 duration) external onlyOwner {
-        requestWindow = duration;
-    }
+    /* ========== RESTRICTED FUNCTIONS ========== */
 
     /**
      * @notice Owner of the contract may create a fund for a user/fundmanager. The fund will allow the user/fundmanager to request funds and claim it after the request window.
@@ -169,6 +171,8 @@ contract FundManagement is Ownable {
 
         fund.totalAmount = fund.totalAmount + amount;
         locked[fund.asset] = currentLocked + amount;
+
+        emit AddToFund(account, amount, fundNumber);
     }
 
     /**
@@ -183,20 +187,21 @@ contract FundManagement is Ownable {
         token.safeTransfer(owner(), amount);
     }
 
-    /* ========== VIEWS ========== */
-
     /**
-     * @notice Checks a users fund if they passed the withdraw window and amount they're able to claim.
+     * @notice Change the duration of time a fund manager needs to wait to withdraw funds they request.
+     * @param duration of time in seconds.
      */
-    function checkClaimableAmount(address account, uint256 fundNumber) external view returns(bool claimable, uint256 amount) {
-        Fund memory fund = funds[account][fundNumber];
-        return (block.timestamp >= fund.requestedWithdrawTime, fund.pendingWithdrawAmount);
+    function setRequestWindow(uint256 duration) external onlyOwner {
+        requestWindow = duration;
+        emit ChangeRequestWindow(duration);
     }
 
     /* ========== EVENTS ========== */
 
-    event CreateFund(address indexed manager, address indexed asset, uint256 amount);
-    event RequestFunds(address indexed to, uint256 amount);
+    event AddToFund(address indexed account, uint256 amount, uint256 fundNumber);
+    event ChangeRequestWindow(uint256 duration);
     event Claim(address indexed to, uint256 amount);
     event Clawback(address indexed account, uint256 fundNumber);
+    event CreateFund(address indexed manager, address indexed asset, uint256 amount);
+    event RequestFunds(address indexed to, uint256 amount);
 }
