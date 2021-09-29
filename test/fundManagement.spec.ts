@@ -333,13 +333,19 @@ describe("Fund Management", function () {
 
         await managerRequestFunds(fundManager, 10000, 0)
 
-        let result = await fundManagerContract.checkClaimableAmount(fundManager.address, 0)
+        let result = await fundManagerContract.checkClaimableAmount(
+            fundManager.address,
+            0
+        )
         expect(result.claimable).to.equal(false)
         expect(result.amount).to.equal(ethToWei(10000))
 
         await skipTwoDays()
 
-        result = await fundManagerContract.checkClaimableAmount(fundManager.address, 0)
+        result = await fundManagerContract.checkClaimableAmount(
+            fundManager.address,
+            0
+        )
         expect(result.claimable).to.equal(true)
         expect(result.amount).to.equal(ethToWei(10000))
     })
