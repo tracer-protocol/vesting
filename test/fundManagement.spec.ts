@@ -51,9 +51,7 @@ describe("Fund Management", function () {
         await managerRequestFunds(fundManager, 10000, 0)
 
         let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith(
-            "Your funds are not withdrawable yet"
-        )
+        await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
 
         let balance = await token.balanceOf(fundManager.address)
         expect(weiToEth(balance)).to.equal(0)
@@ -74,9 +72,7 @@ describe("Fund Management", function () {
         await skipTwoDays()
 
         let tryClaim = fundManagerContract.connect(fundManager).claim(0)
-        await expect(tryClaim).to.be.revertedWith(
-            "Your funds are not withdrawable yet"
-        )
+        await expect(tryClaim).to.be.revertedWith("Not withdrawable yet")
 
         await skipTwoDays()
 
@@ -101,9 +97,7 @@ describe("Fund Management", function () {
         skipTime(24 * 60 * 60)
 
         let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith(
-            "Your funds are not withdrawable yet"
-        )
+        await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
 
         let balance = await token.balanceOf(fundManager.address)
         expect(weiToEth(balance)).to.equal(0)
@@ -190,9 +184,7 @@ describe("Fund Management", function () {
             ethToWei(10000),
             token.address
         )
-        await expect(withdraw).to.be.revertedWith(
-            "Not enough unlocked tokens to withdraw"
-        )
+        await expect(withdraw).to.be.revertedWith("Not enough unlocked tokens")
     })
 
     it("Cannot withdraw more than what is allocated to you by owner", async function () {
@@ -204,7 +196,7 @@ describe("Fund Management", function () {
             .connect(fundManager)
             .requestFunds(0, ethToWei(20000))
         await expect(requestFunds).to.be.revertedWith(
-            "Requested amount plus withdrawable amount greater than total allocated funds"
+            "Amount > total allocated funds"
         )
     })
 
@@ -296,7 +288,7 @@ describe("Fund Management", function () {
             .connect(fundManager)
             .requestFunds(1, ethToWei(10000))
         await expect(requestFunds).to.be.revertedWith(
-            "The input fund number does not exist"
+            "Fund number does not exist"
         )
     })
 

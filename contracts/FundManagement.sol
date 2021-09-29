@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * Managers can request to withdraw funds assigned to them. The DAO may take back the funds at any time.
  */
 contract FundManagement is Ownable {
+    using SafeERC20 for IERC20;
+
     struct Fund {
         uint256 totalAmount; // Total amount of tokens assigned to the manager
         address asset;
@@ -16,7 +18,7 @@ contract FundManagement is Ownable {
         uint256 pendingWithdrawAmount; // Total amount of tokens the manager is pending to withdraw
     }
 
-    using SafeERC20 for IERC20;
+    /* ========== STATE VARIABLES ========== */
 
     uint256 public requestWindow = 2 days;
     mapping(address => mapping(uint256 => Fund)) public funds; // user -> fundId -> fund
@@ -38,18 +40,19 @@ contract FundManagement is Ownable {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice User requests funds that are allocated to him. After the request window if no clawback, they may claim those requested  funds.
+     * @notice User requests funds that are allocated to him. After the request window if no clawback, they may claim those requested funds.
+     * Note: If this function is called while there is already a pending request, it will add to the pending withdrawable amount and reset the request window.
      */
     function requestFunds(uint256 fundNumber, uint256 amount) external {
         require(
-            fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
-            "The input fund number does not exist"
+            fundNumber < numberOfFunds[msg.sender],
+            "Fund number does not exist"
         );
         Fund storage fund = funds[msg.sender][fundNumber];
         uint256 totalWithdrawableAmount = fund.pendingWithdrawAmount + amount;
         require(
             totalWithdrawableAmount <= fund.totalAmount, 
-            "Requested amount plus withdrawable amount greater than total allocated funds"
+            "Amount > total allocated funds"
         );
         
         fund.requestedWithdrawTime = block.timestamp + requestWindow;
@@ -63,8 +66,8 @@ contract FundManagement is Ownable {
      */
     function claim(uint256 fundNumber) external {
         require(
-            fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
-            "The input fund number does not exist"
+            fundNumber < numberOfFunds[msg.sender],
+            "Fund number does not exist"
         );
         Fund storage fund = funds[msg.sender][fundNumber];
         uint256 pendingAmount = fund.pendingWithdrawAmount;
@@ -75,11 +78,11 @@ contract FundManagement is Ownable {
         );
         require(
             pendingAmount <= fund.totalAmount, 
-            "Withdrawable amount greater than total allocated funds"
+            "Amount > total allocated funds"
         );
         require(
             block.timestamp >= fund.requestedWithdrawTime,
-            "Your funds are not withdrawable yet"
+            "Not withdrawable yet"
         );
 
         locked[fund.asset] = locked[fund.asset] - pendingAmount;
@@ -137,8 +140,8 @@ contract FundManagement is Ownable {
             "Account cannot be null"
         );
         require(
-            fundNumber >= 0 && fundNumber < numberOfFunds[account],
-            "The input fund number does not exist"
+            fundNumber < numberOfFunds[account],
+            "Fund number does not exist"
         );
         Fund storage fund = funds[account][fundNumber];
 
@@ -158,15 +161,15 @@ contract FundManagement is Ownable {
             "Account cannot be null"
         );
         require(
-            fundNumber >= 0 && fundNumber < numberOfFunds[account],
-            "The input fund number does not exist"
+            fundNumber < numberOfFunds[account],
+            "Fund number does not exist"
         );
         Fund storage fund = funds[account][fundNumber];
 
         uint256 currentLocked = locked[fund.asset];
         require(
             IERC20(fund.asset).balanceOf(address(this)) - currentLocked >= amount,
-            "Not enough unlocked tokens to add"
+            "Not enough unlocked tokens"
         );
 
         fund.totalAmount = fund.totalAmount + amount;
@@ -182,7 +185,7 @@ contract FundManagement is Ownable {
         IERC20 token = IERC20(asset);
         require(
             token.balanceOf(address(this)) - locked[asset] >= amount,
-            "Not enough unlocked tokens to withdraw"
+            "Not enough unlocked tokens"
         );
         token.safeTransfer(owner(), amount);
     }
