@@ -10,10 +10,10 @@ export const ethToWei = (amount: number): BigNumber => {
 }
 
 export const skipTwoDays = async (): Promise<void> => {
-    await skipTime(2* 24 * 60 * 60)
+    await skipTime(2 * 24 * 60 * 60)
 }
 
 export const skipTime = async (seconds: number): Promise<void> => {
-    await ethers.provider.send('evm_increaseTime', [seconds]);
-    await ethers.provider.send('evm_mine', [])
+    await ethers.provider.send("evm_increaseTime", [seconds])
+    await ethers.provider.send("evm_mine", [])
 }

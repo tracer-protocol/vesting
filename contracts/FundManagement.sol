@@ -31,6 +31,10 @@ contract FundManagement is Ownable {
     constructor() {}
 
     function requestFunds(uint256 fundNumber, uint256 amount) external {
+        require(
+            fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
+            "The input fund number does not exist"
+        );
         Fund storage fund = funds[msg.sender][fundNumber];
         uint256 totalWithdrawableAmount = fund.pendingWithdrawAmount + amount;
         require(
@@ -45,13 +49,19 @@ contract FundManagement is Ownable {
     }
 
     function claim(uint256 fundNumber) external {
-        Fund storage fund = funds[msg.sender][fundNumber];
         require(
-            fund.pendingWithdrawAmount > 0,
+            fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
+            "The input fund number does not exist"
+        );
+        Fund storage fund = funds[msg.sender][fundNumber];
+        uint256 pendingAmount = fund.pendingWithdrawAmount;
+
+        require(
+            pendingAmount > 0,
             "No withdrawable funds"
         );
         require(
-            fund.pendingWithdrawAmount <= fund.totalAmount, 
+            pendingAmount <= fund.totalAmount, 
             "Withdrawable amount greater than total allocated funds"
         );
         require(
@@ -59,13 +69,13 @@ contract FundManagement is Ownable {
             "Your funds are not withdrawable yet"
         );
 
-        IERC20(fund.asset).safeTransfer(msg.sender, fund.pendingWithdrawAmount);
-
-        emit Claim(msg.sender, fund.pendingWithdrawAmount);
-
-        locked[fund.asset] = locked[fund.asset] - fund.pendingWithdrawAmount;
-        fund.totalAmount = fund.totalAmount - fund.pendingWithdrawAmount;
+        locked[fund.asset] = locked[fund.asset] - pendingAmount;
+        fund.totalAmount = fund.totalAmount - pendingAmount;
         fund.pendingWithdrawAmount = 0;
+
+        IERC20(fund.asset).safeTransfer(msg.sender, pendingAmount);
+
+        emit Claim(msg.sender, pendingAmount);
     }
 
     /**
@@ -77,6 +87,10 @@ contract FundManagement is Ownable {
     }
 
     function createFund(address account, uint256 amount, address asset) external onlyOwner {
+        require(
+            account != address(0) && asset != address(0),
+            "Account or asset cannot be null"
+        );
         require(
             amount > 0,
             "Invalid amount"
@@ -104,6 +118,14 @@ contract FundManagement is Ownable {
     }
 
     function clawbackFunds(address account, uint256 fundNumber) external onlyOwner {
+        require(
+            account != address(0),
+            "Account cannot be null"
+        );
+        require(
+            fundNumber >= 0 && fundNumber < numberOfFunds[account],
+            "The input fund number does not exist"
+        );
         Fund storage fund = funds[account][fundNumber];
 
         locked[fund.asset] = locked[fund.asset] - fund.totalAmount;
@@ -114,7 +136,16 @@ contract FundManagement is Ownable {
     }
 
     function addToFund(address account, uint256 amount, uint256 fundNumber) external onlyOwner {
+        require(
+            account != address(0),
+            "Account cannot be null"
+        );
+        require(
+            fundNumber >= 0 && fundNumber < numberOfFunds[account],
+            "The input fund number does not exist"
+        );
         Fund storage fund = funds[account][fundNumber];
+
         uint256 currentLocked = locked[fund.asset];
         require(
             IERC20(fund.asset).balanceOf(address(this)) - currentLocked >= amount,
