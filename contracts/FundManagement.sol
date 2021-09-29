@@ -19,17 +19,17 @@ contract FundManagement is Ownable {
     using SafeERC20 for IERC20;
 
     uint256 public requestWindow = 2 days;
-    mapping(address => mapping(uint256 => Fund)) public funds;
-    mapping(address => uint256) public numberOfFunds;
-    mapping(address => uint256) public locked;
-
-    event CreateFund(address indexed manager, address indexed asset, uint256 amount);
-    event RequestFunds(address indexed to, uint256 amount);
-    event Claim(address indexed to, uint256 amount);
-    event Clawback(address indexed account, uint256 fundNumber);
+    mapping(address => mapping(uint256 => Fund)) public funds; // user -> fundId -> fund
+    mapping(address => uint256) public numberOfFunds; // user -> number of funds owned
+    mapping(address => uint256) public locked; // asset -> amount locked up
 
     constructor() {}
 
+    /* ========== MUTATIVE FUNCTIONS ========== */
+
+    /**
+     * @notice User requests funds that are allocated to him. After the request window if no clawback, they may claim those requested  funds.
+     */
     function requestFunds(uint256 fundNumber, uint256 amount) external {
         require(
             fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
@@ -48,6 +48,9 @@ contract FundManagement is Ownable {
         emit RequestFunds(msg.sender, amount);
     }
 
+    /**
+     * @notice User claims the funds they requested. Only claimable after request window has passed with no clawbacks.
+     */
     function claim(uint256 fundNumber) external {
         require(
             fundNumber >= 0 && fundNumber < numberOfFunds[msg.sender],
@@ -78,15 +81,20 @@ contract FundManagement is Ownable {
         emit Claim(msg.sender, pendingAmount);
     }
 
+    /* ========== ONLY OWNER FUNCTIONS ========== */
+
     /**
-     * @notice allows owner to change the duration of time a fund manager needs to wait to withdraw funds they request.
+     * @notice Change the duration of time a fund manager needs to wait to withdraw funds they request.
      * @param duration of time in seconds.
      */
     function setRequestWindow(uint256 duration) external onlyOwner {
         requestWindow = duration;
     }
 
-    function createFund(address account, uint256 amount, address asset) external onlyOwner {
+    /**
+     * @notice Owner of the contract may create a fund for a user/fundmanager. The fund will allow the user/fundmanager to request funds and claim it after the request window.
+     */
+    function createFund(address account, uint256 amount, address asset) external onlyOwner returns(uint256 fundNumber) {
         require(
             account != address(0) && asset != address(0),
             "Account or asset cannot be null"
@@ -115,8 +123,12 @@ contract FundManagement is Ownable {
         locked[asset] = currentLocked + amount;
 
         emit CreateFund(account, asset, amount);
+        return currentNumFunds;
     }
 
+    /**
+     * @notice Stops a fund from being claimed by deallocating their amount to 0. Those deallocated funds are unlocked for the owner to withdraw or reallocate.
+     */
     function clawbackFunds(address account, uint256 fundNumber) external onlyOwner {
         require(
             account != address(0),
@@ -135,6 +147,9 @@ contract FundManagement is Ownable {
         emit Clawback(account, fundNumber);
     }
 
+    /**
+     * @notice Add more tokens to a fund.
+     */
     function addToFund(address account, uint256 amount, uint256 fundNumber) external onlyOwner {
         require(
             account != address(0),
@@ -156,6 +171,9 @@ contract FundManagement is Ownable {
         locked[fund.asset] = currentLocked + amount;
     }
 
+    /**
+     * @notice Withdraws an asset only if its unlocked/deallocated. If you want to withdraw locked/allocated assets, clawback it first.
+     */
     function withdrawUnlockedAssets(uint256 amount, address asset) external onlyOwner {
         IERC20 token = IERC20(asset);
         require(
@@ -164,4 +182,21 @@ contract FundManagement is Ownable {
         );
         token.safeTransfer(owner(), amount);
     }
+
+    /* ========== VIEWS ========== */
+
+    /**
+     * @notice Checks a users fund if they passed the withdraw window and amount they're able to claim.
+     */
+    function checkClaimableAmount(address account, uint256 fundNumber) external view returns(bool claimable, uint256 amount) {
+        Fund memory fund = funds[account][fundNumber];
+        return (block.timestamp >= fund.requestedWithdrawTime, fund.pendingWithdrawAmount);
+    }
+
+    /* ========== EVENTS ========== */
+
+    event CreateFund(address indexed manager, address indexed asset, uint256 amount);
+    event RequestFunds(address indexed to, uint256 amount);
+    event Claim(address indexed to, uint256 amount);
+    event Clawback(address indexed account, uint256 fundNumber);
 }

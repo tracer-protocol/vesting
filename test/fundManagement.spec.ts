@@ -325,6 +325,24 @@ describe("Fund Management", function () {
             "Account or asset cannot be null"
         )
     })
+
+    it("Check claimable returns correctly", async function () {
+        await transferTokensToContract(token)
+
+        await createFund(10000, fundManager.address, token)
+
+        await managerRequestFunds(fundManager, 10000, 0)
+
+        let result = await fundManagerContract.checkClaimableAmount(fundManager.address, 0)
+        expect(result.claimable).to.equal(false)
+        expect(result.amount).to.equal(ethToWei(10000))
+
+        await skipTwoDays()
+
+        result = await fundManagerContract.checkClaimableAmount(fundManager.address, 0)
+        expect(result.claimable).to.equal(true)
+        expect(result.amount).to.equal(ethToWei(10000))
+    })
 })
 
 async function transferTokensToContract(asset: SampleERC20) {

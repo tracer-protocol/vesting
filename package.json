@@ -20,7 +20,7 @@
         "typescript": "^4.4.3"
     },
     "scripts": {
-        "test": "yarn hardhat test",
+        "test": "yarn hardhat compile && yarn hardhat test",
         "coverage": "yarn hardhat coverage",
         "lint": "prettier --check .",
         "lint:fix": "prettier . --write"
