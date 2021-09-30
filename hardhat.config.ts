@@ -2,6 +2,7 @@ import { HardhatUserConfig } from "hardhat/types"
 import "@nomiclabs/hardhat-waffle"
 import "@typechain/hardhat"
 import "hardhat-deploy"
+import "hardhat-gas-reporter"
 import "solidity-coverage"
 
 const mnemonic = ""
