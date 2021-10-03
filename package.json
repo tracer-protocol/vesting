@@ -13,6 +13,7 @@
         "ethereum-waffle": "^3.4.0",
         "ethers": "^5.4.2",
         "hardhat": "^2.6.1",
+        "hardhat-contract-sizer": "^2.1.1",
         "hardhat-deploy": "^0.8.11",
         "hardhat-gas-reporter": "^1.0.4",
         "solidity-coverage": "^0.7.16",
@@ -23,6 +24,7 @@
     "scripts": {
         "test": "yarn hardhat compile && yarn hardhat test",
         "coverage": "yarn hardhat coverage",
+        "size-contracts": "yarn hardhat size-contracts",
         "lint": "prettier --check .",
         "lint:fix": "prettier . --write"
     },
