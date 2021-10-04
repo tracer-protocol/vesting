@@ -58,7 +58,7 @@ contract FundManagement is Ownable {
         fund.requestedWithdrawTime = block.timestamp + requestWindow;
         fund.pendingWithdrawAmount = totalWithdrawableAmount;
 
-        emit RequestFunds(msg.sender, amount);
+        emit RequestFunds(msg.sender, fundNumber, amount);
     }
 
     /**
@@ -91,7 +91,7 @@ contract FundManagement is Ownable {
 
         IERC20(fund.asset).safeTransfer(msg.sender, pendingAmount);
 
-        emit Claim(msg.sender, pendingAmount);
+        emit Claim(msg.sender, fundNumber, pendingAmount);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -127,7 +127,7 @@ contract FundManagement is Ownable {
         numberOfFunds[account] = currentNumFunds + 1;
         locked[asset] = currentLocked + amount;
 
-        emit CreateFund(account, asset, amount);
+        emit CreateFund(account, numberOfFunds[account], asset, amount);
         return currentNumFunds;
     }
 
@@ -175,7 +175,7 @@ contract FundManagement is Ownable {
         fund.totalAmount = fund.totalAmount + amount;
         locked[fund.asset] = currentLocked + amount;
 
-        emit AddToFund(account, amount, fundNumber);
+        emit AddToFund(account, fundNumber, amount);
     }
 
     /**
@@ -201,10 +201,10 @@ contract FundManagement is Ownable {
 
     /* ========== EVENTS ========== */
 
-    event AddToFund(address indexed account, uint256 amount, uint256 fundNumber);
+    event AddToFund(address indexed account, uint256 fundNumber, uint256 amount);
     event ChangeRequestWindow(uint256 duration);
-    event Claim(address indexed to, uint256 amount);
+    event Claim(address indexed to, uint256 fundNumber, uint256 amount);
     event Clawback(address indexed account, uint256 fundNumber);
-    event CreateFund(address indexed manager, address indexed asset, uint256 amount);
-    event RequestFunds(address indexed to, uint256 amount);
+    event CreateFund(address indexed manager, uint256 fundNumber, address indexed asset, uint256 amount);
+    event RequestFunds(address indexed to, uint256 fundNumber, uint256 amount);
 }
