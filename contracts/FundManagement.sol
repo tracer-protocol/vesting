@@ -20,7 +20,7 @@ contract FundManagement is Ownable {
 
     /* ========== STATE VARIABLES ========== */
 
-    uint256 public requestWindow = 2 days;
+    uint256 public requestWindow = 2 days; // default period needed to wait after requesting that one can withdraw funds
     mapping(address => mapping(uint256 => Fund)) public funds; // user -> fundId -> fund
     mapping(address => uint256) public numberOfFunds; // user -> number of funds owned
     mapping(address => uint256) public locked; // asset -> amount locked up
@@ -40,7 +40,7 @@ contract FundManagement is Ownable {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice User requests funds that are allocated to him. After the request window if no clawback, they may claim those requested funds.
+     * @notice User requests funds that are allocated to them. After the request window if no clawback, they may claim those requested funds.
      * Note: If this function is called while there is already a pending request, it will add to the pending withdrawable amount and reset the request window.
      */
     function requestFunds(uint256 fundNumber, uint256 amount) external {
@@ -99,7 +99,7 @@ contract FundManagement is Ownable {
     /**
      * @notice Owner of the contract may create a fund for a user/fundmanager. The fund will allow the user/fundmanager to request funds and claim it after the request window.
      */
-    function createFund(address account, uint256 amount, address asset) external onlyOwner returns(uint256 fundNumber) {
+    function createFund(address account, uint256 amount, address asset) external onlyOwner returns (uint256 fundNumber) {
         require(
             account != address(0) && asset != address(0),
             "Account or asset cannot be null"
@@ -179,7 +179,7 @@ contract FundManagement is Ownable {
     }
 
     /**
-     * @notice Withdraws an asset only if its unlocked/deallocated. If you want to withdraw locked/allocated assets, clawback it first.
+     * @notice Withdraws an asset only if it's unlocked/deallocated. If you want to withdraw locked/allocated assets, clawback it first.
      */
     function withdrawUnlockedAssets(uint256 amount, address asset) external onlyOwner {
         IERC20 token = IERC20(asset);
