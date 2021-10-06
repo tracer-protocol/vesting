@@ -1,12 +1,14 @@
-require("@nomiclabs/hardhat-waffle")
-require("solidity-coverage")
-require("hardhat-deploy")
+import { HardhatUserConfig } from "hardhat/types"
+import "@nomiclabs/hardhat-waffle"
+import "@typechain/hardhat"
+import "hardhat-deploy"
+import "hardhat-gas-reporter"
+import "solidity-coverage"
+import "hardhat-contract-sizer"
 
 const mnemonic = ""
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
-module.exports = {
+
+const config: HardhatUserConfig = {
     solidity: "0.8.4",
     networks: {
         hardhat: {
@@ -24,6 +26,10 @@ module.exports = {
         },
     },
     namedAccounts: {
-        deployer: 0,
+        deployer: {
+            default: 0,
+        },
     },
 }
+
+export default config
