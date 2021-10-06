@@ -15,7 +15,7 @@ var contractCreator: SignerWithAddress
 var fundManager: SignerWithAddress
 var accounts: SignerWithAddress[]
 
-describe("Fund Management", function () {
+describe("Unit Testing: Fund Management", function () {
     before(async function () {})
 
     beforeEach(async function () {
@@ -30,125 +30,286 @@ describe("Fund Management", function () {
         await token.deployed()
     })
 
-    it("Fund Manager withdraw funds after 2 days of requesting it", async function () {
-        await transferTokensToContract(token)
+    context("Claiming Funds Tests", async () => {
+        it("Fund Manager withdraw funds after 2 days of requesting it", async function () {
+            await transferTokensToContract(token)
 
-        await createFund(10000, fundManager.address, token)
+            await createFund(10000, fundManager.address, token)
 
-        await managerRequestFunds(fundManager, 10000, 0)
-        await skipTwoDays()
-        await claimFunds(fundManager, 0)
+            await managerRequestFunds(fundManager, 10000, 0)
+            await skipTwoDays()
+            await claimFunds(fundManager, 0)
 
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(10000)
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(10000)
+        })
+
+        it("Manager cannot withdraw funds without waiting 2 days", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            await managerRequestFunds(fundManager, 10000, 0)
+
+            let claimFunds = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
+
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(0)
+        })
+
+        it("The request window can be increased to 4 days", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            let changeWindow = await fundManagerContract
+                .connect(contractCreator)
+                .setRequestWindow(4 * 24 * 60 * 60)
+            changeWindow.wait()
+
+            await managerRequestFunds(fundManager, 10000, 0)
+
+            await skipTwoDays()
+
+            let tryClaim = fundManagerContract.connect(fundManager).claim(0)
+            await expect(tryClaim).to.be.revertedWith("Not withdrawable yet")
+
+            await skipTwoDays()
+
+            await claimFunds(fundManager, 0)
+
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(10000)
+        })
+
+        it("Changing request window does not affect existing requests", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            await managerRequestFunds(fundManager, 10000, 0)
+
+            let changeWindow = await fundManagerContract
+                .connect(contractCreator)
+                .setRequestWindow(24 * 60 * 60)
+            changeWindow.wait()
+
+            skipTime(24 * 60 * 60)
+
+            let claimFunds = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
+
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(0)
+        })
+
+        it("Cannot withdraw more than what is allocated to you by owner", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            let requestFunds = fundManagerContract
+                .connect(fundManager)
+                .requestFunds(0, ethToWei(20000))
+            await expect(requestFunds).to.be.revertedWith(
+                "Amount > total allocated funds"
+            )
+        })
+
+        it("Cannot claim funds multiple times unless requesting again", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            await managerRequestFunds(fundManager, 5000, 0)
+            await skipTwoDays()
+            await claimFunds(fundManager, 0)
+
+            let claimAgain = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimAgain).to.be.revertedWith("No withdrawable funds")
+        })
     })
 
-    it("Manager cannot withdraw funds without waiting 2 days", async function () {
-        await transferTokensToContract(token)
+    context("Clawback Tests", async () => {
+        it("Owner can clawback funds", async function () {
+            await transferTokensToContract(token)
 
-        await createFund(10000, fundManager.address, token)
+            await createFund(10000, fundManager.address, token)
 
-        await managerRequestFunds(fundManager, 10000, 0)
+            await managerRequestFunds(fundManager, 10000, 0)
 
-        let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
+            await clawback(fundManager)
 
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(0)
+            let balance = await token.balanceOf(fundManagerContract.address)
+            let lockedBalance = await fundManagerContract.locked(token.address)
+            expect(weiToEth(balance) - weiToEth(lockedBalance)).to.equal(10000)
+
+            await skipTwoDays()
+            let claimFunds = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
+        })
+
+        it("Owner can clawback funds even if the withdraw window is passed as long as the manager hasnt withdrawn", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(10000, fundManager.address, token)
+
+            await managerRequestFunds(fundManager, 10000, 0)
+
+            await skipTwoDays()
+
+            await clawback(fundManager)
+
+            let balance = await token.balanceOf(fundManagerContract.address)
+            let lockedBalance = await fundManagerContract.locked(token.address)
+            expect(weiToEth(balance) - weiToEth(lockedBalance)).to.equal(10000)
+
+            await skipTwoDays()
+
+            let claimFunds = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
+        })
+
+        it("Owner can clawback and withdraw all funds from multiple managers", async function () {
+            await transferTokensToContract(token)
+
+            await createFund(5000, fundManager.address, token)
+            await createFund(5000, accounts[2].address, token)
+
+            await managerRequestFunds(fundManager, 5000, 0)
+            await managerRequestFunds(accounts[2], 5000, 0)
+
+            await clawback(fundManager)
+            await clawback(accounts[2])
+
+            let claimFunds = fundManagerContract.connect(fundManager).claim(0)
+            await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
+
+            let claimFundsAgain = fundManagerContract
+                .connect(accounts[2])
+                .claim(0)
+            await expect(claimFundsAgain).to.be.revertedWith(
+                "No withdrawable funds"
+            )
+        })
     })
 
-    it("The request window can be increased to 4 days", async function () {
-        await transferTokensToContract(token)
+    context("Multiple Users Tests", async () => {
+        it("Works with multiple funds on different assets", async function () {
+            let anotherToken = await deployToken()
+            await anotherToken.deployed()
 
-        await createFund(10000, fundManager.address, token)
+            await transferTokensToContract(token)
+            await transferTokensToContract(anotherToken)
 
-        let changeWindow = await fundManagerContract
-            .connect(contractCreator)
-            .setRequestWindow(4 * 24 * 60 * 60)
-        changeWindow.wait()
+            await createFund(10000, fundManager.address, token)
+            await createFund(10000, fundManager.address, anotherToken)
 
-        await managerRequestFunds(fundManager, 10000, 0)
+            await managerRequestFunds(fundManager, 10000, 0)
+            await managerRequestFunds(fundManager, 10000, 1)
 
-        await skipTwoDays()
+            await skipTwoDays()
 
-        let tryClaim = fundManagerContract.connect(fundManager).claim(0)
-        await expect(tryClaim).to.be.revertedWith("Not withdrawable yet")
+            await claimFunds(fundManager, 0)
+            await claimFunds(fundManager, 1)
 
-        await skipTwoDays()
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(10000)
+            balance = await anotherToken.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(10000)
+        })
 
-        await claimFunds(fundManager, 0)
+        it("Works with multiple managers on different assets", async function () {
+            let anotherToken = await deployToken()
+            await anotherToken.deployed()
 
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(10000)
+            await transferTokensToContract(token)
+            await transferTokensToContract(anotherToken)
+
+            await createFund(10000, fundManager.address, token)
+            await createFund(10000, accounts[2].address, anotherToken)
+
+            await managerRequestFunds(fundManager, 10000, 0)
+            await managerRequestFunds(accounts[2], 10000, 0)
+
+            await skipTwoDays()
+
+            await claimFunds(fundManager, 0)
+            await claimFunds(accounts[2], 0)
+
+            let balance = await token.balanceOf(fundManager.address)
+            expect(weiToEth(balance)).to.equal(10000)
+            balance = await anotherToken.balanceOf(accounts[2].address)
+            expect(weiToEth(balance)).to.equal(10000)
+        })
     })
 
-    it("Changing request window does not affect existing requests", async function () {
-        await transferTokensToContract(token)
+    context("Token Accounting Tests", async () => {
+        it("Withdraw unlocked assets cannot withdraw locked assets", async function () {
+            await transferTokensToContract(token)
 
-        await createFund(10000, fundManager.address, token)
+            await createFund(5000, fundManager.address, token)
 
-        await managerRequestFunds(fundManager, 10000, 0)
+            let withdraw = fundManagerContract.withdrawUnlockedAssets(
+                ethToWei(10000),
+                token.address
+            )
+            await expect(withdraw).to.be.revertedWith(
+                "Not enough unlocked tokens"
+            )
+        })
 
-        let changeWindow = await fundManagerContract
-            .connect(contractCreator)
-            .setRequestWindow(24 * 60 * 60)
-        changeWindow.wait()
-
-        skipTime(24 * 60 * 60)
-
-        let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith("Not withdrawable yet")
-
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(0)
+        it("Owner cannot create fund without having enough tokens", async function () {
+            await transferTokensToContract(token)
+            let createFund = fundManagerContract.createFund(
+                fundManager.address,
+                ethToWei(20000),
+                token.address
+            )
+            await expect(createFund).to.be.revertedWith("Not enough tokens")
+        })
     })
 
-    it("Works with multiple funds on different assets", async function () {
-        let anotherToken = await deployToken()
-        await anotherToken.deployed()
+    context("Bad Request Tests", async () => {
+        it("Fund number out of bounds", async function () {
+            await transferTokensToContract(token)
 
-        await transferTokensToContract(token)
-        await transferTokensToContract(anotherToken)
+            await createFund(10000, fundManager.address, token)
 
-        await createFund(10000, fundManager.address, token)
-        await createFund(10000, fundManager.address, anotherToken)
+            let requestFunds = fundManagerContract
+                .connect(fundManager)
+                .requestFunds(1, ethToWei(10000))
+            await expect(requestFunds).to.be.revertedWith(
+                "Fund number does not exist"
+            )
+        })
 
-        await managerRequestFunds(fundManager, 10000, 0)
-        await managerRequestFunds(fundManager, 10000, 1)
+        it("Account null", async function () {
+            await transferTokensToContract(token)
 
-        await skipTwoDays()
+            let createFund = fundManagerContract.createFund(
+                "0x0000000000000000000000000000000000000000",
+                ethToWei(10000),
+                token.address
+            )
+            await expect(createFund).to.be.revertedWith(
+                "Account or asset cannot be null"
+            )
+        })
 
-        await claimFunds(fundManager, 0)
-        await claimFunds(fundManager, 1)
+        it("Asset null", async function () {
+            await transferTokensToContract(token)
 
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(10000)
-        balance = await anotherToken.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(10000)
-    })
-
-    it("Works with multiple managers on different assets", async function () {
-        let anotherToken = await deployToken()
-        await anotherToken.deployed()
-
-        await transferTokensToContract(token)
-        await transferTokensToContract(anotherToken)
-
-        await createFund(10000, fundManager.address, token)
-        await createFund(10000, accounts[2].address, anotherToken)
-
-        await managerRequestFunds(fundManager, 10000, 0)
-        await managerRequestFunds(accounts[2], 10000, 0)
-
-        await skipTwoDays()
-
-        await claimFunds(fundManager, 0)
-        await claimFunds(accounts[2], 0)
-
-        let balance = await token.balanceOf(fundManager.address)
-        expect(weiToEth(balance)).to.equal(10000)
-        balance = await anotherToken.balanceOf(accounts[2].address)
-        expect(weiToEth(balance)).to.equal(10000)
+            let createFund = fundManagerContract.createFund(
+                fundManager.address,
+                ethToWei(10000),
+                "0x0000000000000000000000000000000000000000"
+            )
+            await expect(createFund).to.be.revertedWith(
+                "Account or asset cannot be null"
+            )
+        })
     })
 
     it("Owner can add to a fund", async function () {
@@ -173,149 +334,6 @@ describe("Fund Management", function () {
 
         let balance = await token.balanceOf(fundManager.address)
         expect(weiToEth(balance)).to.equal(10000)
-    })
-
-    it("Withdraw unlocked assets cannot withdraw locked assets", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(5000, fundManager.address, token)
-
-        let withdraw = fundManagerContract.withdrawUnlockedAssets(
-            ethToWei(10000),
-            token.address
-        )
-        await expect(withdraw).to.be.revertedWith("Not enough unlocked tokens")
-    })
-
-    it("Cannot withdraw more than what is allocated to you by owner", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(10000, fundManager.address, token)
-
-        let requestFunds = fundManagerContract
-            .connect(fundManager)
-            .requestFunds(0, ethToWei(20000))
-        await expect(requestFunds).to.be.revertedWith(
-            "Amount > total allocated funds"
-        )
-    })
-
-    it("Cannot claim funds multiple times unless requesting again", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(10000, fundManager.address, token)
-
-        await managerRequestFunds(fundManager, 5000, 0)
-        await skipTwoDays()
-        await claimFunds(fundManager, 0)
-
-        let claimAgain = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimAgain).to.be.revertedWith("No withdrawable funds")
-    })
-
-    it("Owner cannot create fund without having enough tokens", async function () {
-        await transferTokensToContract(token)
-        let createFund = fundManagerContract.createFund(
-            fundManager.address,
-            ethToWei(20000),
-            token.address
-        )
-        await expect(createFund).to.be.revertedWith("Not enough tokens")
-    })
-
-    it("Owner can clawback funds", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(10000, fundManager.address, token)
-
-        await managerRequestFunds(fundManager, 10000, 0)
-
-        await clawback(fundManager)
-
-        // Check unlocked balance is 10k
-
-        await skipTwoDays()
-        let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
-    })
-
-    it("Owner can clawback funds even if the withdraw window is passed as long as the manager hasnt withdrawn", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(10000, fundManager.address, token)
-
-        await managerRequestFunds(fundManager, 10000, 0)
-
-        await skipTwoDays()
-
-        await clawback(fundManager)
-
-        // Check unlocked balance is 10k
-
-        await skipTwoDays()
-
-        let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
-    })
-
-    it("Owner can clawback and withdraw all funds from multiple managers", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(5000, fundManager.address, token)
-        await createFund(5000, accounts[2].address, token)
-
-        await managerRequestFunds(fundManager, 5000, 0)
-        await managerRequestFunds(accounts[2], 5000, 0)
-
-        await clawback(fundManager)
-        await clawback(accounts[2])
-
-        let claimFunds = fundManagerContract.connect(fundManager).claim(0)
-        await expect(claimFunds).to.be.revertedWith("No withdrawable funds")
-
-        let claimFundsAgain = fundManagerContract.connect(accounts[2]).claim(0)
-        await expect(claimFundsAgain).to.be.revertedWith(
-            "No withdrawable funds"
-        )
-    })
-
-    it("Fund number out of bounds", async function () {
-        await transferTokensToContract(token)
-
-        await createFund(10000, fundManager.address, token)
-
-        let requestFunds = fundManagerContract
-            .connect(fundManager)
-            .requestFunds(1, ethToWei(10000))
-        await expect(requestFunds).to.be.revertedWith(
-            "Fund number does not exist"
-        )
-    })
-
-    it("Account null", async function () {
-        await transferTokensToContract(token)
-
-        let createFund = fundManagerContract.createFund(
-            "0x0000000000000000000000000000000000000000",
-            ethToWei(10000),
-            token.address
-        )
-        await expect(createFund).to.be.revertedWith(
-            "Account or asset cannot be null"
-        )
-    })
-
-    it("Asset null", async function () {
-        await transferTokensToContract(token)
-
-        let createFund = fundManagerContract.createFund(
-            fundManager.address,
-            ethToWei(10000),
-            "0x0000000000000000000000000000000000000000"
-        )
-        await expect(createFund).to.be.revertedWith(
-            "Account or asset cannot be null"
-        )
     })
 
     it("Check claimable returns correctly", async function () {
