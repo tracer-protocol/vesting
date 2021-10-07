@@ -114,7 +114,7 @@ contract FundManagement is Ownable {
             "Not enough tokens"
         );
 
-        uint256 fundNumber = numberOfFunds[account];
+        fundNumber = numberOfFunds[account];
         funds[account][fundNumber] = Fund(
             {
                 totalAmount: amount,
@@ -128,7 +128,6 @@ contract FundManagement is Ownable {
         locked[asset] = currentLocked + amount;
 
         emit CreateFund(account, fundNumber, asset, amount);
-        return fundNumber;
     }
 
     /**
