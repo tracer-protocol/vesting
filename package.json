@@ -11,8 +11,8 @@
         "@types/node": "^16.7.10",
         "chai": "^4.3.4",
         "ethereum-waffle": "^3.4.0",
-        "ethers": "^5.4.2",
-        "hardhat": "^2.6.1",
+        "ethers": "^5.6.8",
+        "hardhat": "^2.9.7",
         "hardhat-contract-sizer": "^2.1.1",
         "hardhat-deploy": "^0.8.11",
         "hardhat-gas-reporter": "^1.0.4",
@@ -30,6 +30,7 @@
     },
     "dependencies": {
         "@openzeppelin/contracts": "^4.2.0",
-        "csv-parse": "^5.1.0"
+        "csv-parse": "^5.1.0",
+        "dotenv": "^16.0.1"
     }
 }
