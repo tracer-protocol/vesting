@@ -29,3 +29,8 @@ If you wish to verify the source code on Etherscan, use the command
 `yarn hardhat etherscan-verify --network <NETWORK> --api-key <API_KEY> --license "None" --force-license`
 
 The use of `--license "None` and the `--force-license` flags are due to Etherscan not supporting the license GPL-3.0-only.
+
+# Using the automated vesting scripts
+- Ensure csv file is formatted as per description in parse vesting (see example CSV)
+- Run `node scripts/ParseVesting` to run the script.
+- Use the Gnosis transaction builder to create a batch transaction to setup vesting (https://help.gnosis-safe.io/en/articles/4680071-transaction-builder)

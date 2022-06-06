@@ -29,6 +29,7 @@
         "lint:fix": "prettier . --write"
     },
     "dependencies": {
-        "@openzeppelin/contracts": "^4.2.0"
+        "@openzeppelin/contracts": "^4.2.0",
+        "csv-parse": "^5.1.0"
     }
 }
